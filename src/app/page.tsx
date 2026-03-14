@@ -27,6 +27,16 @@ import {
   Pizza,
   Salad,
   UtensilsCrossed,
+  Ticket,
+  Users,
+  BookOpen,
+  Heart,
+  Timer,
+  BadgePercent,
+  Crown,
+  Wifi,
+  Volume2,
+  Armchair,
 } from "lucide-react";
 
 /* ───────────────────────── Types ───────────────────────── */
@@ -41,6 +51,7 @@ interface Restaurant {
   tags: string[];
   category: string;
   campus: string;
+  deal?: string;
 }
 
 interface Comment {
@@ -220,6 +231,69 @@ const filterTags = [
   { label: "出餐快", icon: Zap },
 ];
 
+const tagDealMap: Record<string, (r: Restaurant) => string | null> = {
+  吃土专区: (r) => {
+    const deals = [
+      r.price <= 10 && `加1元升级大份`,
+      r.price <= 12 && `满${r.price}减${Math.max(2, Math.floor(r.price * 0.2))}`,
+      r.price <= 15 && `工作日午市第二份半价`,
+      r.price <= 18 && `套餐立减3元`,
+      `持学生卡减2元`,
+    ];
+    return deals[(r.id * 3) % deals.length] || deals[deals.length - 1] || null;
+  },
+  社团聚餐: (r) => {
+    const deals = [
+      `6人以上享8.5折`,
+      `满4人送一扎饮料`,
+      `团购5人套餐省¥${Math.floor(r.price * 0.6)}`,
+      `3人拼桌送饮品`,
+      `生日当天寿星免单`,
+      `大桌预订免包间费`,
+    ];
+    return deals[(r.id * 7) % deals.length];
+  },
+  期末自习: (r) => {
+    const deals = [
+      `消费即享不限时WiFi`,
+      `续杯半价`,
+      `充电宝免费借`,
+      `点饮品送小食`,
+      `期末周买一送一`,
+      `自习套餐含饮品¥${Math.max(15, r.price - 5)}`,
+    ];
+    return deals[(r.id * 5) % deals.length];
+  },
+  一人食: (r) => {
+    const deals = [
+      `单人套餐含饮料¥${Math.max(10, r.price - 3)}`,
+      `加卤蛋只要+1元`,
+      `集卡买5送1`,
+      `工作日午市专属折扣`,
+      `单人堂食免配送费`,
+      `每日限定款¥${Math.max(8, r.price - 5)}`,
+    ];
+    return deals[(r.id * 11) % deals.length];
+  },
+  出餐快: (r) => {
+    const deals = [
+      `下单5分钟保证出餐`,
+      `课间套餐3分钟出餐`,
+      `超时未出餐免单`,
+      `午高峰提前下单减¥2`,
+      `打包带走立减1元`,
+      `闪电出餐 · 均速${2 + (r.id % 4)}分钟`,
+    ];
+    return deals[(r.id * 9) % deals.length];
+  },
+};
+
+function getTagDeal(tag: string, restaurant: Restaurant): string | null {
+  if (tag === "全部" || !tagDealMap[tag]) return null;
+  if (!restaurant.tags.includes(tag)) return null;
+  return tagDealMap[tag](restaurant);
+}
+
 const categoryFilters = [
   { label: "不限", icon: UtensilsCrossed },
   { label: "简餐", icon: Utensils },
@@ -235,6 +309,201 @@ const categoryFilters = [
   { label: "日料", icon: Utensils },
   { label: "东南亚", icon: Utensils },
 ];
+
+/* ──────────────────── Tab Context Banner ──────────────────── */
+
+function TabBanner({
+  activeTag,
+  restaurants,
+}: {
+  activeTag: string;
+  restaurants: Restaurant[];
+}) {
+  if (activeTag === "全部") return null;
+
+  const cheapest = restaurants.length
+    ? restaurants.reduce((a, b) => (a.price < b.price ? a : b))
+    : null;
+  const topRated = restaurants.length
+    ? restaurants.reduce((a, b) => (a.rating > b.rating ? a : b))
+    : null;
+
+  const banners: Record<
+    string,
+    {
+      bg: string;
+      border: string;
+      icon: React.ReactNode;
+      title: string;
+      desc: string;
+      highlights: { icon: React.ReactNode; text: string }[];
+    }
+  > = {
+    吃土专区: {
+      bg: "from-amber-50 to-orange-50",
+      border: "border-amber-200/60",
+      icon: <BadgePercent className="w-5 h-5 text-amber-500" />,
+      title: "月底省钱攻略",
+      desc: "精选人均 ¥15 以下好店，让你的钱包和胃都满意",
+      highlights: [
+        {
+          icon: <Ticket className="w-3.5 h-3.5 text-amber-500" />,
+          text: cheapest
+            ? `最低 ¥${cheapest.price}「${cheapest.name}」`
+            : "暂无数据",
+        },
+        {
+          icon: <Crown className="w-3.5 h-3.5 text-amber-500" />,
+          text: topRated
+            ? `性价比之王「${topRated.name}」${topRated.rating}分`
+            : "",
+        },
+        {
+          icon: <Zap className="w-3.5 h-3.5 text-amber-500" />,
+          text: `共 ${restaurants.length} 家穷学生友好店`,
+        },
+      ],
+    },
+    社团聚餐: {
+      bg: "from-violet-50 to-purple-50",
+      border: "border-violet-200/60",
+      icon: <Users className="w-5 h-5 text-violet-500" />,
+      title: "聚餐好去处",
+      desc: "适合 4 人以上聚餐，空间大、氛围好、可拼桌",
+      highlights: [
+        {
+          icon: <Users className="w-3.5 h-3.5 text-violet-500" />,
+          text: `${restaurants.length} 家支持多人聚餐`,
+        },
+        {
+          icon: <Crown className="w-3.5 h-3.5 text-violet-500" />,
+          text: topRated
+            ? `人气最旺「${topRated.name}」${topRated.rating}分`
+            : "",
+        },
+        {
+          icon: <Ticket className="w-3.5 h-3.5 text-violet-500" />,
+          text: "部分店家 6 人以上享 8.5 折",
+        },
+      ],
+    },
+    期末自习: {
+      bg: "from-sky-50 to-cyan-50",
+      border: "border-sky-200/60",
+      icon: <BookOpen className="w-5 h-5 text-sky-500" />,
+      title: "学习续命站",
+      desc: "有 WiFi、有插座、安静不赶人，备考人的第二自习室",
+      highlights: [
+        {
+          icon: <Wifi className="w-3.5 h-3.5 text-sky-500" />,
+          text: `${restaurants.length} 家提供免费 WiFi`,
+        },
+        {
+          icon: <Volume2 className="w-3.5 h-3.5 text-sky-500" />,
+          text: "环境安静，适合长时间停留",
+        },
+        {
+          icon: <Coffee className="w-3.5 h-3.5 text-sky-500" />,
+          text: topRated
+            ? `学霸最爱「${topRated.name}」`
+            : "",
+        },
+      ],
+    },
+    一人食: {
+      bg: "from-pink-50 to-rose-50",
+      border: "border-pink-200/60",
+      icon: <Heart className="w-5 h-5 text-pink-500" />,
+      title: "一个人也要好好吃饭",
+      desc: "不尴尬、有隔板、不用拼桌，享受独处的美食时光",
+      highlights: [
+        {
+          icon: <Armchair className="w-3.5 h-3.5 text-pink-500" />,
+          text: `${restaurants.length} 家单人友好餐厅`,
+        },
+        {
+          icon: <Heart className="w-3.5 h-3.5 text-pink-500" />,
+          text: topRated
+            ? `独食首选「${topRated.name}」${topRated.rating}分`
+            : "",
+        },
+        {
+          icon: <Ticket className="w-3.5 h-3.5 text-pink-500" />,
+          text: cheapest
+            ? `最低只要 ¥${cheapest.price}`
+            : "",
+        },
+      ],
+    },
+    出餐快: {
+      bg: "from-emerald-50 to-teal-50",
+      border: "border-emerald-200/60",
+      icon: <Timer className="w-5 h-5 text-emerald-500" />,
+      title: "课间 10 分钟极速出餐",
+      desc: "赶时间？这些店 5 分钟内出餐，下课冲刺不迟到",
+      highlights: [
+        {
+          icon: <Timer className="w-3.5 h-3.5 text-emerald-500" />,
+          text: `${restaurants.length} 家闪电出餐`,
+        },
+        {
+          icon: <Zap className="w-3.5 h-3.5 text-emerald-500" />,
+          text: topRated
+            ? `最快最好吃「${topRated.name}」`
+            : "",
+        },
+        {
+          icon: <MapPin className="w-3.5 h-3.5 text-emerald-500" />,
+          text: "大部分距教学楼步行 3 分钟内",
+        },
+      ],
+    },
+  };
+
+  const banner = banners[activeTag];
+  if (!banner) return null;
+
+  return (
+    <motion.div
+      key={activeTag}
+      initial={{ opacity: 0, y: -10, height: 0 }}
+      animate={{ opacity: 1, y: 0, height: "auto" }}
+      exit={{ opacity: 0, y: -10, height: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="mb-4 overflow-hidden"
+    >
+      <div
+        className={`bg-gradient-to-r ${banner.bg} rounded-2xl border ${banner.border} p-4`}
+      >
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-white/80 flex items-center justify-center flex-shrink-0 shadow-sm">
+            {banner.icon}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-bold text-slate-700 mb-0.5">
+              {banner.title}
+            </h3>
+            <p className="text-xs text-slate-400 mb-3 leading-relaxed">
+              {banner.desc}
+            </p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+              {banner.highlights
+                .filter((h) => h.text)
+                .map((h, i) => (
+                  <div key={i} className="flex items-center gap-1.5">
+                    {h.icon}
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      {h.text}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 /* ──────────────────── Star Rating Input ──────────────────── */
 
@@ -490,13 +759,26 @@ function DetailModal({
 
 /* ──────────────────── Restaurant Card ──────────────────── */
 
+const tagDealStyles: Record<string, { bg: string; text: string; border: string; icon: string }> = {
+  吃土专区: { bg: "bg-amber-50", text: "text-amber-600", border: "border-amber-200", icon: "🏷️" },
+  社团聚餐: { bg: "bg-violet-50", text: "text-violet-600", border: "border-violet-200", icon: "🎉" },
+  期末自习: { bg: "bg-sky-50", text: "text-sky-600", border: "border-sky-200", icon: "📚" },
+  一人食: { bg: "bg-pink-50", text: "text-pink-600", border: "border-pink-200", icon: "💝" },
+  出餐快: { bg: "bg-emerald-50", text: "text-emerald-600", border: "border-emerald-200", icon: "⚡" },
+};
+
 function RestaurantCard({
   restaurant,
   onClick,
+  activeTag = "全部",
 }: {
   restaurant: Restaurant;
   onClick: () => void;
+  activeTag?: string;
 }) {
+  const deal = getTagDeal(activeTag, restaurant);
+  const dealStyle = deal ? tagDealStyles[activeTag] : null;
+
   return (
     <motion.div
       layout
@@ -520,6 +802,18 @@ function RestaurantCard({
               {restaurant.rating}
             </span>
           </div>
+          {deal && dealStyle && (
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="absolute top-3 left-0"
+            >
+              <div className={`${dealStyle.bg} ${dealStyle.text} ${dealStyle.border} border-r border-y pl-2.5 pr-3 py-1 rounded-r-full text-[11px] font-bold shadow-sm backdrop-blur-sm flex items-center gap-1`}>
+                <span>{dealStyle.icon}</span>
+                <span>{deal}</span>
+              </div>
+            </motion.div>
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
         </div>
         <div className="p-4">
@@ -539,7 +833,11 @@ function RestaurantCard({
             {restaurant.tags.map((tag) => (
               <span
                 key={tag}
-                className="text-[11px] px-2 py-0.5 rounded-full bg-slate-50 text-slate-500 border border-slate-100"
+                className={`text-[11px] px-2 py-0.5 rounded-full border ${
+                  tag === activeTag && activeTag !== "全部"
+                    ? `${dealStyle?.bg || "bg-orange-50"} ${dealStyle?.text || "text-orange-500"} ${dealStyle?.border || "border-orange-200"} font-semibold`
+                    : "bg-slate-50 text-slate-500 border-slate-100"
+                }`}
               >
                 {tag}
               </span>
@@ -831,10 +1129,25 @@ export default function BiteCampusPage() {
             <h1 className="text-xl font-bold text-slate-800 tracking-tight">BiteCampus</h1>
             <p className="text-xs text-slate-400">校园干饭指南</p>
           </div>
+          <div className="ml-auto text-right">
+            <p className="text-xs font-medium text-slate-500">蒋凌雨</p>
+            <p className="text-[11px] text-slate-400">15003358938</p>
+          </div>
         </div>
       </header>
 
-      <div className="md:grid md:grid-cols-5 md:gap-6 md:px-10 lg:px-16 px-5">
+      <AnimatePresence>
+        {mobileView === "map" && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="md:hidden px-5 mb-4 space-y-4">
+            <CampusMap selectedCampus={selectedCampus} onSelectCampus={setSelectedCampus} />
+            <AnimatePresence>
+              {selectedCampus && <CampusNearbyPanel key={selectedCampus} campusName={selectedCampus} onClose={() => setSelectedCampus(null)} onSelectRestaurant={setSelectedRestaurant} />}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className={`md:grid md:grid-cols-5 md:gap-6 md:px-10 lg:px-16 px-5 ${mobileView === "map" ? "hidden md:grid" : ""}`}>
         <div className="md:col-span-3">
           <div className="relative mb-4">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
@@ -850,9 +1163,16 @@ export default function BiteCampusPage() {
             {filterTags.map((tag) => {
               const isActive = activeTag === tag.label;
               const Icon = tag.icon;
+              const count = tag.label === "全部"
+                ? mockRestaurants.length
+                : mockRestaurants.filter((r) => r.tags.includes(tag.label)).length;
               return (
                 <button key={tag.label} onClick={() => setActiveTag(tag.label)} className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all active:scale-95 ${isActive ? "bg-orange-500 text-white shadow-md shadow-orange-200" : "bg-white text-slate-500 border border-slate-100 hover:border-orange-200 hover:text-orange-500"}`}>
-                  <Icon className="w-3.5 h-3.5" />{tag.label}
+                  <Icon className="w-3.5 h-3.5" />
+                  {tag.label}
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full leading-none ${isActive ? "bg-white/25 text-white" : "bg-slate-100 text-slate-400"}`}>
+                    {count}
+                  </span>
                 </button>
               );
             })}
@@ -869,6 +1189,10 @@ export default function BiteCampusPage() {
               );
             })}
           </div>
+
+          <AnimatePresence mode="wait">
+            <TabBanner activeTag={activeTag} restaurants={filteredRestaurants} />
+          </AnimatePresence>
 
           <AnimatePresence>
             {selectedCampus && (
@@ -889,7 +1213,7 @@ export default function BiteCampusPage() {
               <AnimatePresence mode="popLayout">
                 {filteredRestaurants.length > 0 ? (
                   filteredRestaurants.map((r) => (
-                    <RestaurantCard key={r.id} restaurant={r} onClick={() => setSelectedRestaurant(r)} />
+                    <RestaurantCard key={r.id} restaurant={r} onClick={() => setSelectedRestaurant(r)} activeTag={activeTag} />
                   ))
                 ) : (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="col-span-full py-20 text-center">
@@ -952,17 +1276,6 @@ export default function BiteCampusPage() {
           </div>
         </div>
       </nav>
-
-      <AnimatePresence>
-        {mobileView === "map" && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="md:hidden px-5 mt-4 space-y-4">
-            <CampusMap selectedCampus={selectedCampus} onSelectCampus={setSelectedCampus} />
-            <AnimatePresence>
-              {selectedCampus && <CampusNearbyPanel key={selectedCampus} campusName={selectedCampus} onClose={() => setSelectedCampus(null)} onSelectRestaurant={setSelectedRestaurant} />}
-            </AnimatePresence>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <RandomModal isOpen={showRandomModal} onClose={() => setShowRandomModal(false)} onViewDetail={(r) => setSelectedRestaurant(r)} />
 
