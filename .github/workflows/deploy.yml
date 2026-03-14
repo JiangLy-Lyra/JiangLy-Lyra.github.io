@@ -36,7 +36,7 @@ jobs:
         run: npm ci
 
       - name: Build with Next.js
-        run: npx next build --no-turbopack
+        run: npx next build --webpack
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
